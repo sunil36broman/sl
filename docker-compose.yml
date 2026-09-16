@@ -2,11 +2,11 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: realestate
-      POSTGRES_USER: realestate
-      POSTGRES_PASSWORD: realestate
+      POSTGRES_DB: ${POSTGRES_DB:-realestate}
+      POSTGRES_USER: ${POSTGRES_USER:-realestate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-realestate}
     volumes: [postgres_data:/var/lib/postgresql/data]
-    healthcheck: {test: [CMD-SHELL, "pg_isready -U realestate"], interval: 10s, timeout: 5s, retries: 5}
+    healthcheck: {test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"'], interval: 10s, timeout: 5s, retries: 5}
   web:
     build: .
     env_file: .env
