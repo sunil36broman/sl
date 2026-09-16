@@ -12,9 +12,9 @@ services:
     env_file: .env
     environment:
       PUBLIC_API_ORIGIN: ${PUBLIC_API_ORIGIN:-http://localhost:8000}
-    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --access-logfile - --error-logfile - --capture-output"
+    command: sh -c "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --access-logfile - --error-logfile - --capture-output"
     ports: ["8000:8000"]
-    volumes: [media_data:/app/media, static_data:/app/staticfiles]
+    volumes: [media_data:/app/media]
     depends_on: {db: {condition: service_healthy}}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/home/')"]
@@ -33,4 +33,4 @@ services:
     depends_on:
       web: {condition: service_healthy}
     restart: unless-stopped
-volumes: {postgres_data: {}, media_data: {}, static_data: {}}
+volumes: {postgres_data: {}, media_data: {}}
