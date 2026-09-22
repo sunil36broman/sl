@@ -99,8 +99,8 @@ export default async function ContactUs() {
               </li>
               <li>
                 <span className="contact-detail-icon" aria-hidden="true">✉</span>
-                <span><small>Email us</small><a href={`mailto:${settings.email || "hello@arcadia.com"}`}>
-                  {settings.email || "hello@arcadia.com"}
+                <span><small>Email us</small><a href={`mailto:${settings.email || "info@raha.com"}`}>
+                  {settings.email || "info@raha.com"}
                 </a></span>
               </li>
               <li>
@@ -115,7 +115,7 @@ export default async function ContactUs() {
           <div className="contact-map">
             <iframe
               src={map}
-              title={`${settings.company_name || "Arcadia"} office location`}
+              title={`${settings.company_name || "Raha"} office location`}
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               allowFullScreen

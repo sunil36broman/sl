@@ -20,4 +20,7 @@ urlpatterns = [
     path("api/v1/", include("landowners.urls")),
     path("api/v1/", include("newsletter.urls")),
     path("api/v1/", include("settings_app.urls")),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -4,9 +4,15 @@
 .venv
 frontend/node_modules
 frontend/.next
+frontend
 **/__pycache__
 **/*.pyc
 .pytest_cache
+.coverage
+.coverage.*
 htmlcov
 media
 staticfiles
+demo_assets
+backups
+docs

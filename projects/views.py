@@ -8,11 +8,11 @@ from rest_framework.response import Response
 from common.mixins import AuditActorMixin
 from common.permissions import IsProjectManager
 from amenities.models import Amenity
-from media_gallery.models import GalleryItem
+from media_gallery.models import GalleryItem, ProgressImage
 from properties.models import ApartmentType, Unit
 from .filters import ProjectFilter
 from .models import ConstructionProgress, Project, PropertyType
-from .serializers import AmenitySerializer, ApartmentTypeSerializer, ConstructionProgressSerializer, GalleryItemSerializer, ProjectDetailSerializer, ProjectListSerializer, PropertyTypeSerializer, UnitSerializer
+from .serializers import AmenitySerializer, ApartmentTypeSerializer, ConstructionProgressSerializer, GalleryItemSerializer, ProgressImageSerializer, ProjectDetailSerializer, ProjectListSerializer, PropertyTypeSerializer, UnitSerializer
 
 class ManagedViewSet(AuditActorMixin, viewsets.ModelViewSet):
     permission_classes = [IsProjectManager]
@@ -104,4 +104,9 @@ class GalleryViewSet(ManagedViewSet):
     def reorder(self, request):
         for item in request.data.get("items", []): GalleryItem.objects.filter(pk=item["id"]).update(display_order=item["display_order"])
         return Response(status=status.HTTP_204_NO_CONTENT)
-class ProgressViewSet(ManagedViewSet): queryset = ConstructionProgress.objects.select_related("project"); serializer_class = ConstructionProgressSerializer; filterset_fields = ("project", "is_published", "is_active"); search_fields = ("title", "description", "project__name")
+class ProgressViewSet(ManagedViewSet): queryset = ConstructionProgress.objects.select_related("project").prefetch_related("images"); serializer_class = ConstructionProgressSerializer; filterset_fields = ("project", "is_published", "is_active"); search_fields = ("title", "description", "project__name")
+class ProgressImageViewSet(ManagedViewSet):
+    queryset = ProgressImage.objects.select_related("progress", "progress__project")
+    serializer_class = ProgressImageSerializer
+    filterset_fields = ("progress",)
+    search_fields = ("alt_text", "progress__title", "progress__project__name")

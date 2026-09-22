@@ -16,7 +16,7 @@ DJANGO_APPS = [
 ]
 THIRD_PARTY_APPS = [
     "rest_framework", "rest_framework_simplejwt.token_blacklist", "drf_spectacular",
-    "django_filters", "corsheaders", "django_extensions",
+    "django_filters", "corsheaders", "storages",
 ]
 LOCAL_APPS = [
     "common", "accounts", "locations", "amenities", "projects", "properties",
@@ -56,6 +56,37 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE, TIME_ZONE, USE_I18N, USE_TZ = "en-us", "Asia/Dhaka", True, True
 STATIC_URL, STATIC_ROOT = "/static/", BASE_DIR / "staticfiles"
 MEDIA_URL, MEDIA_ROOT = "/media/", BASE_DIR / "media"
+AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
+AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="ap-southeast-1")
+AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default="") or None
+AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN", default="") or None
+AWS_S3_FILE_OVERWRITE = False
+AWS_DEFAULT_ACL = None
+AWS_QUERYSTRING_AUTH = env.bool("AWS_QUERYSTRING_AUTH", default=True)
+AWS_QUERYSTRING_EXPIRE = env.int("AWS_QUERYSTRING_EXPIRE", default=3600)
+AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
+
+STORAGES = {
+    "default": {
+        "BACKEND": "common.storage.ImageS3MediaStorage",
+        "OPTIONS": {
+            "bucket_name": AWS_STORAGE_BUCKET_NAME,
+            "region_name": AWS_S3_REGION_NAME,
+            "endpoint_url": AWS_S3_ENDPOINT_URL,
+            "custom_domain": AWS_S3_CUSTOM_DOMAIN,
+            "location": "media",
+            "file_overwrite": AWS_S3_FILE_OVERWRITE,
+            "default_acl": AWS_DEFAULT_ACL,
+            "querystring_auth": AWS_QUERYSTRING_AUTH,
+            "querystring_expire": AWS_QUERYSTRING_EXPIRE,
+            "object_parameters": AWS_S3_OBJECT_PARAMETERS,
+        },
+    },
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+} if AWS_STORAGE_BUCKET_NAME else {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
 PUBLIC_API_ORIGIN = env("PUBLIC_API_ORIGIN", default="")
 CAPTCHA_VERIFY_URL = env("CAPTCHA_VERIFY_URL", default="https://challenges.cloudflare.com/turnstile/v0/siteverify")
 CAPTCHA_SECRET = env("CAPTCHA_SECRET", default="")

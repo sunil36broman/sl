@@ -11,7 +11,6 @@ import {ProjectInquiryForm} from "@/components/project-inquiry-form";
 import {BrochureDownload} from "@/components/brochure-download";
 import {UnlockPrice} from "@/components/unlock-price";
 import {API_URL} from "@/lib/api";
-import {demoProject} from "@/lib/demo-projects";
 
 const progressByStatus:Record<string,number>={UPCOMING:8,ONGOING:55,READY:92,HANDED_OVER:100};
 const prettyDate=(date?:string|null)=>date?new Intl.DateTimeFormat("en",{day:"numeric",month:"short",year:"numeric"}).format(new Date(date)):"To be announced";
@@ -21,7 +20,7 @@ export default async function Detail({params}:{params:Promise<{slug:string}>}){
   const {slug}=await params;
   let project:any;
   try{const response=await fetch(`${API_URL}/projects/slug/${slug}/`,{cache:"no-store"});if(response.ok){const body=await response.json();project=body.data||body;}}catch{}
-  project=project||demoProject(slug);if(!project)return notFound();
+  if(!project)return notFound();
   const gallery=project.gallery_items||[];
   const mainImages=[project.hero_banner||project.featured_image,...gallery.filter((item:any)=>item.kind!=="FLOOR_PLAN").map((item:any)=>item.image||item.url)].filter(Boolean);
   const floorPlans=[...(project.apartment_types||[]).map((item:any)=>item.floor_plan),...gallery.filter((item:any)=>item.kind==="FLOOR_PLAN").map((item:any)=>item.image||item.url)].filter(Boolean);

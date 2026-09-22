@@ -8,7 +8,7 @@ export function WhatsAppButton(){
   const pathname=usePathname();
   const configured=site.social_links?.whatsapp||"";
   const number=(site.hotline||"+8801700000000").replace(/\D/g,"");
-  const href=configured||`https://wa.me/${number}?text=${encodeURIComponent(`Hello ${site.company_name||"Arcadia Properties"}, I would like to know more about your projects.`)}`;
+  const href=configured||`https://wa.me/${number}?text=${encodeURIComponent(`Hello ${site.company_name||"Raha Holdings"}, I would like to know more about your projects.`)}`;
 
   if(pathname.startsWith("/admin-dashboard")||pathname==="/dashboard"||pathname==="/login")return null;
 

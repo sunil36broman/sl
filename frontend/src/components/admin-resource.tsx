@@ -18,6 +18,8 @@ type Config = {
   fixedFilters?: Record<string, string>;
   excludeBlockTypes?: string[];
   allowedKeys?: string[];
+  createdAtField?: string;
+  ordering?: string;
 };
 const imageFields = new Set([
   "featured_image",
@@ -568,6 +570,8 @@ export const resources: Record<string, Config> = {
   users: {
     title: "Users & roles",
     endpoint: "/auth/users/",
+    createdAtField: "date_joined",
+    ordering: "-date_joined",
     columns: [
       ["email", "Email"],
       ["first_name", "First name"],
@@ -668,6 +672,18 @@ export const resources: Record<string, Config> = {
       F("completion_percentage", "Completion percentage", "number"),
       F("video_url", "Video URL"),
       F("is_published", "Published", "checkbox"),
+      F("is_active", "Active", "checkbox"),
+    ],
+  },
+  "progress-images": {
+    title: "Construction progress images",
+    description: "Upload photographs for construction progress updates. Images are stored in S3.",
+    endpoint: "/progress-images/",
+    columns: [["project_name", "Project"], ["progress_title", "Progress update"], ["alt_text", "Alternative text"]],
+    fields: [
+      F("progress", "Progress update", "progress-select"),
+      F("image", "Progress image", "file"),
+      F("alt_text", "Alternative text"),
       F("is_active", "Active", "checkbox"),
     ],
   },
@@ -792,9 +808,18 @@ export function AdminResource({ name }: { name: string }) {
     [loading, setLoading] = useState(true),
     [query, setQuery] = useState(""),
     [filters, setFilters] = useState<Record<string, string>>({}),
+    [page, setPage] = useState(1),
+    [pageSize, setPageSize] = useState(12),
+    [total, setTotal] = useState(0),
     [error, setError] = useState(""),
     [editing, setEditing] = useState<Row | null>(null),
     [open, setOpen] = useState(false);
+  const createdAtField = config?.createdAtField || "created_at";
+  const tableColumns: [string, string][] = config
+    ? config.columns.some(([key]) => key === createdAtField)
+      ? config.columns
+      : [...config.columns, [createdAtField, "Created Date"]]
+    : [];
   async function load() {
     if (!config) return;
     setLoading(true);
@@ -804,15 +829,19 @@ export function AdminResource({ name }: { name: string }) {
           b = await r.json();
         if (!r.ok) throw Error();
         setRows([b.data || b]);
+        setTotal(1);
       } else {
-        const params = new URLSearchParams({page_size: "100", search: query});
+        const clientFiltered=Boolean(config.excludeBlockTypes?.length||config.allowedKeys?.length);
+        const params = new URLSearchParams({page_size: clientFiltered?"100":String(pageSize), search: query, ordering: config.ordering || `-${createdAtField}`});
+        if(!clientFiltered)params.set("page",String(page));
         Object.entries(config.fixedFilters || {}).forEach(([key, value]) => params.set(key, value));
         Object.entries(filters).forEach(([key, value]) => { if (value) params.set(key, value); });
-        const items=(await adminData<Row>(`${config.endpoint}?${params.toString()}`)).items;
+        const result=await adminData<Row>(`${config.endpoint}?${params.toString()}`),items=result.items;
         let visible=items;
         if(config.excludeBlockTypes?.length)visible=visible.filter(item=>!config.excludeBlockTypes!.includes(String(item.block_type)));
         if(config.allowedKeys?.length)visible=visible.filter(item=>config.allowedKeys!.includes(String(item.key)));
-        setRows(visible);
+        setTotal(clientFiltered?visible.length:result.count);
+        setRows(clientFiltered?visible.slice((page-1)*pageSize,page*pageSize):visible);
       }
       setError("");
     } catch {
@@ -824,7 +853,8 @@ export function AdminResource({ name }: { name: string }) {
   useEffect(() => {
     const timer = setTimeout(() => void load(), 300);
     return () => clearTimeout(timer);
-  }, [name, query, filters]);
+  }, [name, query, filters, page, pageSize]);
+  useEffect(() => setPage(1), [name]);
   if (!config) return <div className="admin-panel">Unknown module.</div>;
   async function edit(row: Row) {
     if (row.id && !config.singleton) {
@@ -871,9 +901,9 @@ export function AdminResource({ name }: { name: string }) {
           }}
           className="admin-filter-toolbar m-5"
         >
-          <div className="relative min-w-56 flex-1"><Icon name="search" className="absolute left-3 top-3 h-4 w-4" /><input value={query} onChange={(e) => setQuery(e.target.value)} className="h-10 pl-10!" placeholder="Search" /></div>
-          {config.filters?.map(([key, label, , options]) => <select key={key} aria-label={label} value={filters[key] || ""} onChange={(e) => setFilters((current) => ({...current, [key]: e.target.value}))} className="h-10 min-w-40"><option value="">{label}</option>{options?.map((option) => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}</select>)}
-          {(query || Object.values(filters).some(Boolean)) && <button type="button" className="px-3 text-xs underline" onClick={() => {setQuery(""); setFilters({});}}>Clear</button>}
+          <div className="relative min-w-56 flex-1"><Icon name="search" className="absolute left-3 top-3 h-4 w-4" /><input value={query} onChange={(e) => {setQuery(e.target.value);setPage(1)}} className="h-10 pl-10!" placeholder="Search" /></div>
+          {config.filters?.map(([key, label, , options]) => <select key={key} aria-label={label} value={filters[key] || ""} onChange={(e) => {setFilters((current) => ({...current, [key]: e.target.value}));setPage(1)}} className="h-10 min-w-40"><option value="">{label}</option>{options?.map((option) => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}</select>)}
+          {(query || Object.values(filters).some(Boolean)) && <button type="button" className="px-3 text-xs underline" onClick={() => {setQuery(""); setFilters({});setPage(1)}}>Clear</button>}
         </form>
         {loading ? (
           <Msg t="Loading…" />
@@ -882,11 +912,12 @@ export function AdminResource({ name }: { name: string }) {
         ) : !rows.length ? (
           <Msg t="No records yet." />
         ) : (
+          <div>
           <div className="overflow-x-auto">
             <table className="admin-table">
               <thead>
                 <tr>
-                  {config.columns.map((x) => (
+                  {tableColumns.map((x) => (
                     <th key={x[0]}>{x[1]}</th>
                   ))}
                   <th>Actions</th>
@@ -895,7 +926,7 @@ export function AdminResource({ name }: { name: string }) {
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={r.id || i}>
-                    {config.columns.map((x) => (
+                    {tableColumns.map((x) => (
                       <td key={x[0]}>
                         {name === "page-headers" && x[0] === "key"
                           ? pageHeaderName(String(r[x[0]] || ""))
@@ -905,7 +936,9 @@ export function AdminResource({ name }: { name: string }) {
                             ? contentSectionName(String(r[x[0]] || ""))
                           : name === "content" && x[0] === "block_type"
                             ? contentTypeName(String(r[x[0]] || ""))
-                          : fmt(r[x[0]])}
+                          : x[0] === createdAtField
+                            ? fmtDateTime(r[x[0]])
+                            : fmt(r[x[0]])}
                       </td>
                     ))}
                     <td>
@@ -929,6 +962,8 @@ export function AdminResource({ name }: { name: string }) {
               </tbody>
             </table>
           </div>
+          {!config.singleton&&total>0&&<AdminPagination page={page} pageSize={pageSize} total={total} onPage={setPage} onPageSize={(size)=>{setPageSize(size);setPage(1)}}/>}
+          </div>
         )}
       </section>
       {open && (
@@ -945,6 +980,10 @@ export function AdminResource({ name }: { name: string }) {
     </>
   );
 }
+function AdminPagination({page,pageSize,total,onPage,onPageSize}:{page:number;pageSize:number;total:number;onPage:(page:number)=>void;onPageSize:(size:number)=>void}){
+  const totalPages=Math.max(1,Math.ceil(total/pageSize)),start=Math.max(1,Math.min(page-2,totalPages-4)),end=Math.min(totalPages,start+4),pages=Array.from({length:end-start+1},(_,index)=>start+index),first=(page-1)*pageSize+1,last=Math.min(page*pageSize,total);
+  return <div className="flex flex-col gap-3 border-t border-black/8 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3 text-xs text-stone"><span>Showing {first}–{last} of {total}</span><label className="flex items-center gap-2">Rows<select className="h-8 min-w-16" value={pageSize} onChange={event=>onPageSize(Number(event.target.value))}>{[12,25,50,100].map(size=><option key={size} value={size}>{size}</option>)}</select></label></div><nav className="flex items-center gap-1" aria-label="Table pagination"><button type="button" className="h-8 px-3 text-xs disabled:opacity-35" disabled={page<=1} onClick={()=>onPage(page-1)}>Previous</button>{pages.map(number=><button type="button" key={number} aria-current={number===page?"page":undefined} className={`grid h-8 min-w-8 place-items-center border text-xs ${number===page?"border-forest bg-forest text-white":"border-black/10"}`} onClick={()=>onPage(number)}>{number}</button>)}<button type="button" className="h-8 px-3 text-xs disabled:opacity-35" disabled={page>=totalPages} onClick={()=>onPage(page+1)}>Next</button></nav></div>
+}
 function Editor({
   config,
   value,
@@ -959,6 +998,7 @@ function Editor({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [projects, setProjects] = useState<Row[]>([]),
+    [progressUpdates, setProgressUpdates] = useState<Row[]>([]),
     [categories, setCategories] = useState<Row[]>([]),
     [tags, setTags] = useState<Row[]>([]),
     [divisions, setDivisions] = useState<Row[]>([]),
@@ -977,6 +1017,10 @@ function Editor({
       adminData<Row>("/projects/?page_size=100")
         .then((result) => setProjects(result.items))
         .catch(() => setProjects([]));
+    if (config.fields.some((field) => field[2] === "progress-select"))
+      adminData<Row>("/progress/?page_size=100")
+        .then((result) => setProgressUpdates(result.items))
+        .catch(() => setProgressUpdates([]));
     if (config.fields.some((field) => field[2] === "category-select"))
       adminData<Row>("/blog-categories/?page_size=100")
         .then((result) => setCategories(result.items))
@@ -1179,6 +1223,11 @@ function Editor({
                   {options?.map((o) => (
                     <option key={o}>{o}</option>
                   ))}
+                </select>
+              ) : type === "progress-select" ? (
+                <select name={key} defaultValue={relationId(value[key])} required>
+                  <option value="">Select a progress update</option>
+                  {progressUpdates.map((item) => <option key={String(item.id)} value={String(item.id)}>{String(item.project_name||"Project")} — {String(item.title||"Progress update")}</option>)}
                 </select>
               ) : type === "project-select" ? (
                 <select
@@ -1536,4 +1585,13 @@ function fmt(v: unknown) {
   if (v && typeof v === "object")
     return String((v as Row).name || (v as Row).id || "—");
   return v == null || v === "" ? "—" : String(v).replaceAll("_", " ");
+}
+function fmtDateTime(value: unknown) {
+  if (typeof value !== "string" || !value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return fmt(value);
+  return new Intl.DateTimeFormat("en-BD", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
